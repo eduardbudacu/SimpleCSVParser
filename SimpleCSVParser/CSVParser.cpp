@@ -1,3 +1,7 @@
+/*
+ * @author: Eduard Budacu
+ * @email: eduard@dovelopers.com
+*/
 #include<iostream>
 #include<vector>
 #include<string>
@@ -53,8 +57,11 @@ std::ostream& operator<<(std::ostream& out, CSVLine& line) {
 	return out;
 }
 
+
 class CSVFile {
 	std::vector<CSVLine*> lines;
+	void (*columnLoadedEvent)(int, CSVColumn*);
+	void (*lineLoadedEvent)(int, CSVLine*);
 public:
 	CSVFile() {}
 	void addLine(CSVLine* line) {
@@ -69,6 +76,14 @@ public:
 
 	friend std::ostream& operator<<(std::ostream& out, CSVFile& file);
 
+	void setColumnLoadedEvent(void (*v_columnLoadedEvent)(int, CSVColumn*)) {
+		this->columnLoadedEvent = v_columnLoadedEvent;
+	}
+
+	void setLineLoadedEvent(void (*v_lineLoadedEvent)(int, CSVLine*)) {
+		this->lineLoadedEvent = v_lineLoadedEvent;
+	}
+
 	void load(const char* file_path) {
 		std::ifstream file;
 		file.open(file_path, std::ifstream::in);
@@ -76,6 +91,8 @@ public:
 		char column[10000];
 		bool quote = false;
 		int j = 0;
+		int columnCount = 0;
+		int lineCount = 0;
 
 		CSVLine* l = new CSVLine();
 
@@ -92,8 +109,18 @@ public:
 				column[j] = '\0';
 				j = 0;
 
-				l->addColumn(new CSVColumn(column));
+				CSVColumn* col = new CSVColumn(column);
+				l->addColumn(col);
+
+				if(this->columnLoadedEvent)
+					(this->columnLoadedEvent) (columnCount, col);
+				
+				columnCount = 0;
+
 				this->addLine(l);
+				if (this->lineLoadedEvent)
+					(this->lineLoadedEvent) (lineCount, l);
+				lineCount++;
 
 				l = new CSVLine();
 				c = file.get();
@@ -103,7 +130,11 @@ public:
 			if (c == ',' && quote == false) {
 				column[j] = '\0';
 				j = 0;
-				l->addColumn(new CSVColumn(column));
+				CSVColumn* col = new CSVColumn(column);
+				
+				(this->columnLoadedEvent) (columnCount, col);
+				l->addColumn(col);
+				columnCount++;
 			}
 			else {
 				column[j] = c;
@@ -125,11 +156,25 @@ std::ostream& operator<<(std::ostream& out, CSVFile& file) {
 }
 
 
+void columnLoaded(int index, CSVColumn* column) {
+	std::cout << "Am detectat coloana: " << index << std::endl;
+	std::cout << *column << std::endl;
+}
+
+void lineLoaded(int index, CSVLine* line) {
+	std::cout << "Am detectat linia: " << index << std::endl;
+	std::cout << *line << std::endl;
+}
+
 
 int main() {
 
 	CSVFile csv;
+	csv.setColumnLoadedEvent(&columnLoaded);
+	csv.setLineLoadedEvent(&lineLoaded);
 	csv.load("feed_componente_pc_test.csv");
+
+
 
 	std::cout << csv;
 	std::cout << csv[1][1];
